@@ -1,13 +1,16 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useGameStore } from '../store/gameStore'
-import { RoleCard } from '../components/RoleCard'
+import { RoleCard, CountdownButton } from '../components/RoleCard'
 import { Button } from '../components/Button'
+
+const MIN_VIEW_TIME = 5000
 
 export function RoleRevealScreen() {
   const game = useGameStore((s) => s.game)!
   const advanceToNight = useGameStore((s) => s.advanceToNight)
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(-1)
   const [confirmed, setConfirmed] = useState(false)
+  const [firstRevealedAt, setFirstRevealedAt] = useState<number | null>(null)
 
   const playerNameMap = useMemo(
     () => Object.fromEntries(game.players.map((p) => [p.id, p.name])),
@@ -15,6 +18,18 @@ export function RoleRevealScreen() {
   )
 
   const allRevealed = currentPlayerIndex >= game.players.length
+
+  const handleFirstReveal = useCallback(() => {
+    setFirstRevealedAt(Date.now())
+  }, [])
+
+  const handleNext = useCallback(() => {
+    setConfirmed(false)
+    setFirstRevealedAt(null)
+    setCurrentPlayerIndex((i) => i + 1)
+  }, [])
+
+  const timerActive = firstRevealedAt !== null
 
   if (currentPlayerIndex === -1) {
     return (
@@ -60,19 +75,14 @@ export function RoleRevealScreen() {
           sees={nightInfo.sees}
           playerNameMap={playerNameMap}
           description={nightInfo.description}
+          onFirstReveal={handleFirstReveal}
         />
         <div className="mt-6">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setConfirmed(false)
-              setCurrentPlayerIndex(currentPlayerIndex + 1)
-            }}
-          >
+          <CountdownButton durationMs={MIN_VIEW_TIME} active={timerActive} onClick={handleNext}>
             {currentPlayerIndex < game.players.length - 1
-              ? `Done — Pass to ${game.players[currentPlayerIndex + 1].name}`
-              : 'Done — All players revealed'}
-          </Button>
+              ? `Done \u2014 Pass to ${game.players[currentPlayerIndex + 1].name}`
+              : 'Done \u2014 All players revealed'}
+          </CountdownButton>
         </div>
       </div>
     )

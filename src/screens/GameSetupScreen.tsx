@@ -126,7 +126,7 @@ export function GameSetupScreen() {
     }))
     const finalConfig = { ...effectiveConfig, playerCount }
     startGame(players, finalConfig, mode)
-    navigate('/game')
+    navigate(mode === 'local' ? '/player-order' : '/game')
   }
 
   return (

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { HomeScreen } from './screens/HomeScreen'
 import { GameSetupScreen } from './screens/GameSetupScreen'
+import { PlayerOrderScreen } from './screens/PlayerOrderScreen'
 import { GameScreen } from './screens/GameScreen'
 import { RoomScreen } from './screens/RoomScreen'
 import { LobbyScreen } from './screens/LobbyScreen'
@@ -12,6 +13,7 @@ export function App() {
       <Routes>
         <Route path="/" element={<HomeScreen />} />
         <Route path="/setup" element={<GameSetupScreen />} />
+        <Route path="/player-order" element={<PlayerOrderScreen />} />
         <Route path="/game" element={<GameScreen />} />
         <Route path="/room" element={<RoomScreen />} />
         <Route path="/lobby" element={<LobbyScreen />} />

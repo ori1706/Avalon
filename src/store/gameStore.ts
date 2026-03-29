@@ -11,6 +11,7 @@ import type {
 } from '../game/types'
 import {
   initializeGame,
+  buildNightInfo,
   resolveTeamVote,
   resolveQuest,
   checkGameEnd,
@@ -33,6 +34,7 @@ interface GameStore {
   selectAssassinTarget: (targetId: string) => void
   resolveAssassinationPhase: () => void
   useLadyOfTheLake: (targetId: string) => void
+  reorderPlayers: (players: Player[]) => void
   resetGame: () => void
 }
 
@@ -316,6 +318,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
         ladyOfTheLakeHistory: [...game.ladyOfTheLakeHistory, targetId],
         ladyOfTheLakeHolder: targetId,
         phase: 'questResult',
+      },
+    })
+  },
+
+  reorderPlayers: (players) => {
+    const { game } = get()
+    if (!game) return
+
+    const nightInfo = buildNightInfo(players)
+    set({
+      game: {
+        ...game,
+        players,
+        nightInfo,
       },
     })
   },
