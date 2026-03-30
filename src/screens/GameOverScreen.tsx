@@ -31,7 +31,7 @@ export function GameOverScreen() {
           <p className="text-sm opacity-80">{game.winReason}</p>
         </div>
 
-        <QuestTracker quests={game.quests} currentQuest={-1} />
+        <QuestTracker quests={game.quests} currentQuest={-1} players={game.players} />
 
         <div className="w-full max-w-sm mt-8">
           <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wide mb-4 text-center">
