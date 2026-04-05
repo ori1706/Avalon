@@ -75,8 +75,12 @@ export function LobbyScreen() {
     const finalConfig = { ...config, playerCount: players.length }
     const gameState = initializeGame(players, finalConfig, 'online')
 
-    await startOnlineGame(roomCode, gameState)
-    navigate('/online-game')
+    try {
+      await startOnlineGame(roomCode, gameState)
+      navigate('/online-game')
+    } catch (e) {
+      console.error('Failed to start game:', e)
+    }
   }, [room, roomCode, playerList, config, navigate])
 
   const handleLeave = async () => {
