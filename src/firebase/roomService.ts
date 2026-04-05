@@ -11,6 +11,12 @@ import {
 import { getDb } from './config'
 import type { GameState, GameConfig } from '../game/types'
 
+// Firebase Realtime Database rejects `undefined` values.
+// JSON round-trip strips them cleanly (undefined → omitted, functions → omitted).
+function sanitize<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj))
+}
+
 function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
   let code = ''
@@ -105,7 +111,7 @@ export async function updateGameState(
 ): Promise<void> {
   const db = getDb()
   await update(ref(db, `rooms/${code}`), {
-    gameState,
+    gameState: sanitize(gameState),
     status: gameState.phase === 'gameOver' ? 'finished' : 'playing',
     lastActivity: serverTimestamp(),
   })
@@ -117,7 +123,7 @@ export async function startOnlineGame(
 ): Promise<void> {
   const db = getDb()
   await update(ref(db, `rooms/${code}`), {
-    gameState,
+    gameState: sanitize(gameState),
     status: 'playing',
     lastActivity: serverTimestamp(),
   })
