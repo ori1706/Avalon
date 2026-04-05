@@ -94,8 +94,9 @@ function QuestDetailModal({
   const getName = (id: string) =>
     players?.find((p) => p.id === id)?.name ?? '???'
 
-  const successes = quest.cards.filter((c) => c.action === 'success').length
-  const fails = quest.cards.filter((c) => c.action === 'fail').length
+  const cards = quest.cards ?? []
+  const successes = cards.filter((c) => c.action === 'success').length
+  const fails = cards.filter((c) => c.action === 'fail').length
   const isSuccess = quest.result === 'success'
 
   return (
@@ -127,10 +128,10 @@ function QuestDetailModal({
         {/* Team */}
         <div className="mb-4">
           <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">
-            Team ({quest.proposedTeam.length} players)
+            Team ({(quest.proposedTeam ?? []).length} players)
           </p>
           <div className="flex flex-wrap gap-2">
-            {quest.proposedTeam.map((id) => (
+            {(quest.proposedTeam ?? []).map((id) => (
               <span
                 key={id}
                 className="px-3 py-1 bg-avalon-slate/50 rounded-full text-sm text-slate-200"

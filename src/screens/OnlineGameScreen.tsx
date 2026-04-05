@@ -20,6 +20,11 @@ import {
 import { ROLES } from '../game/roles'
 import type { GameState, Alignment } from '../game/types'
 
+function safeArray<T>(val: T[] | null | undefined): T[] {
+  if (Array.isArray(val)) return val
+  return []
+}
+
 export function OnlineGameScreen() {
   const navigate = useNavigate()
   const { roomCode, playerId, isHost } = useFirebaseRoom()
@@ -42,7 +47,7 @@ export function OnlineGameScreen() {
     )
   }
 
-  const myPlayer = game.players.find((p) => p.id === playerId)
+  const myPlayer = safeArray(game.players).find((p) => p.id === playerId)
   if (!myPlayer) {
     return (
       <div className="flex flex-col items-center justify-center min-h-full bg-avalon-dark px-6">
@@ -87,9 +92,9 @@ interface PhaseProps {
 }
 
 function OnlineRoleReveal({ game, playerId, roomCode, isHost }: PhaseProps) {
-  const myInfo = game.nightInfo.find((n) => n.playerId === playerId)!
+  const myInfo = safeArray(game.nightInfo).find((n) => n.playerId === playerId)!
   const playerNameMap = useMemo(
-    () => Object.fromEntries(game.players.map((p) => [p.id, p.name])),
+    () => Object.fromEntries(safeArray(game.players).map((p) => [p.id, p.name])),
     [game.players]
   )
 
@@ -120,7 +125,7 @@ function OnlineRoleReveal({ game, playerId, roomCode, isHost }: PhaseProps) {
 
 function OnlineNightPhase({ game, roomCode, isHost }: PhaseProps) {
   const leader = getLeader(game)
-  const quest = game.quests[game.currentQuest]
+  const quest = safeArray(game.quests)[game.currentQuest]
 
   return (
     <div className="flex flex-col items-center justify-center min-h-full px-6 bg-gradient-to-b from-avalon-dark to-avalon-darker">
@@ -145,22 +150,23 @@ function OnlineTeamProposal({ game, roomCode, playerId }: PhaseProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const leader = getLeader(game)
   const quest = getCurrentQuest(game)
-  const isLeader = leader.id === playerId
+  const players = safeArray(game.players)
+  const isLeader = leader?.id === playerId
 
   const togglePlayer = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
-      else if (next.size < quest.teamSize) next.add(id)
+      else if (next.size < quest?.teamSize) next.add(id)
       return next
     })
   }
 
   const handlePropose = async () => {
-    const quests = [...game.quests]
+    const quests = [...safeArray(game.quests)]
     quests[game.currentQuest] = {
       ...quests[game.currentQuest],
-      leader: leader.id,
+      leader: leader?.id ?? '',
       proposedTeam: Array.from(selectedIds),
     }
     await updateGameState(roomCode, { ...game, quests, phase: 'teamVote', votes: [] })
@@ -172,17 +178,17 @@ function OnlineTeamProposal({ game, roomCode, playerId }: PhaseProps) {
       <div className="flex-1 flex flex-col items-center px-4 py-6">
         <p className="text-sm text-slate-400">Quest {game.currentQuest + 1}</p>
         <h1 className="text-xl font-bold mt-1 mb-1">
-          {isLeader ? 'Propose your team' : `${leader.name} is choosing a team`}
+          {isLeader ? 'Propose your team' : `${leader?.name} is choosing a team`}
         </h1>
         <p className="text-sm text-slate-400 mb-6">
-          Select {quest.teamSize} players
-          {quest.requiresDoubleFail && <span className="text-avalon-evil-light"> (needs 2 fails)</span>}
+          Select {quest?.teamSize} players
+          {quest?.requiresDoubleFail && <span className="text-avalon-evil-light"> (needs 2 fails)</span>}
         </p>
 
         {isLeader ? (
           <>
             <div className="grid grid-cols-4 gap-4 mb-6">
-              {game.players.map((p) => (
+              {players.map((p) => (
                 <PlayerAvatarWithName
                   key={p.id}
                   name={p.name}
@@ -192,14 +198,14 @@ function OnlineTeamProposal({ game, roomCode, playerId }: PhaseProps) {
                 />
               ))}
             </div>
-            <p className="text-sm text-slate-400 mb-4">{selectedIds.size} / {quest.teamSize}</p>
-            <Button fullWidth disabled={selectedIds.size !== quest.teamSize} onClick={handlePropose} className="max-w-xs">
+            <p className="text-sm text-slate-400 mb-4">{selectedIds.size} / {quest?.teamSize}</p>
+            <Button fullWidth disabled={selectedIds.size !== quest?.teamSize} onClick={handlePropose} className="max-w-xs">
               Propose Team
             </Button>
           </>
         ) : (
           <div className="text-center">
-            <p className="text-slate-400 animate-pulse">Waiting for {leader.name} to propose a team...</p>
+            <p className="text-slate-400 animate-pulse">Waiting for {leader?.name} to propose a team...</p>
           </div>
         )}
       </div>
@@ -210,22 +216,25 @@ function OnlineTeamProposal({ game, roomCode, playerId }: PhaseProps) {
 function OnlineTeamVote({ game, roomCode, playerId }: PhaseProps) {
   const quest = getCurrentQuest(game)
   const leader = getLeader(game)
-  const hasVoted = game.votes.some((v) => v.playerId === playerId)
-  const allVoted = game.votes.length === game.players.length
+  const votes = safeArray(game.votes)
+  const players = safeArray(game.players)
+  const proposedTeam = safeArray(quest?.proposedTeam)
+  const hasVoted = votes.some((v) => v.playerId === playerId)
+  const allVoted = votes.length === players.length
 
   const teamPlayers = useMemo(
-    () => game.players.filter((p) => quest.proposedTeam.includes(p.id)),
-    [game.players, quest.proposedTeam]
+    () => players.filter((p) => proposedTeam.includes(p.id)),
+    [players, proposedTeam]
   )
 
   const handleVote = async (vote: 'approve' | 'reject') => {
-    const newVotes = [...game.votes, { playerId, vote }]
+    const newVotes = [...votes, { playerId, vote }]
     const updatedGame = { ...game, votes: newVotes }
 
-    if (newVotes.length === game.players.length) {
+    if (newVotes.length === players.length) {
       const approved = resolveTeamVote(newVotes)
       if (approved) {
-        const quests = [...game.quests]
+        const quests = [...safeArray(game.quests)]
         quests[game.currentQuest] = { ...quests[game.currentQuest], votes: newVotes }
         await updateGameState(roomCode, {
           ...updatedGame,
@@ -236,10 +245,10 @@ function OnlineTeamVote({ game, roomCode, playerId }: PhaseProps) {
         })
       } else {
         const rej = game.consecutiveRejections + 1
-        const quests = [...game.quests]
+        const quests = [...safeArray(game.quests)]
         quests[game.currentQuest] = {
           ...quests[game.currentQuest],
-          voteRejections: quests[game.currentQuest].voteRejections + 1,
+          voteRejections: (quests[game.currentQuest].voteRejections ?? 0) + 1,
         }
         if (rej >= 5) {
           await updateGameState(roomCode, {
@@ -255,7 +264,7 @@ function OnlineTeamVote({ game, roomCode, playerId }: PhaseProps) {
             ...updatedGame,
             quests,
             consecutiveRejections: rej,
-            currentLeaderIndex: getNextLeaderIndex(game.currentLeaderIndex, game.players.length),
+            currentLeaderIndex: getNextLeaderIndex(game.currentLeaderIndex, players.length),
             phase: 'teamProposal',
           })
         }
@@ -266,8 +275,8 @@ function OnlineTeamVote({ game, roomCode, playerId }: PhaseProps) {
   }
 
   if (allVoted) {
-    const approvals = game.votes.filter((v) => v.vote === 'approve').length
-    const rejections = game.votes.filter((v) => v.vote === 'reject').length
+    const approvals = votes.filter((v) => v.vote === 'approve').length
+    const rejections = votes.filter((v) => v.vote === 'reject').length
     const approved = approvals > rejections
 
     return (
@@ -296,7 +305,7 @@ function OnlineTeamVote({ game, roomCode, playerId }: PhaseProps) {
         </div>
 
         <p className="text-xs text-slate-500 mb-4">
-          {game.votes.length} / {game.players.length} voted
+          {votes.length} / {players.length} voted
         </p>
 
         {hasVoted ? (
@@ -314,18 +323,20 @@ function OnlineTeamVote({ game, roomCode, playerId }: PhaseProps) {
 
 function OnlineQuest({ game, roomCode, playerId }: PhaseProps) {
   const quest = getCurrentQuest(game)
-  const isOnTeam = quest.proposedTeam.includes(playerId)
-  const hasPlayed = game.questCards.some((c) => c.playerId === playerId)
-  const allPlayed = game.questCards.length === quest.proposedTeam.length
+  const proposedTeam = safeArray(quest?.proposedTeam)
+  const questCards = safeArray(game.questCards)
+  const isOnTeam = proposedTeam.includes(playerId)
+  const hasPlayed = questCards.some((c) => c.playerId === playerId)
+  const allPlayed = questCards.length === proposedTeam.length
   const myPlayer = game.players.find((p) => p.id === playerId)!
-  const isEvil = myPlayer.alignment === 'evil'
+  const isEvil = myPlayer?.alignment === 'evil'
 
   const handlePlay = async (action: 'success' | 'fail') => {
-    const newCards = [...game.questCards, { playerId, action }]
+    const newCards = [...questCards, { playerId, action }]
 
-    if (newCards.length === quest.proposedTeam.length) {
+    if (newCards.length === proposedTeam.length) {
       const result = resolveQuest(newCards, quest.requiresDoubleFail)
-      const quests = [...game.quests]
+      const quests = [...safeArray(game.quests)]
       quests[game.currentQuest] = { ...quests[game.currentQuest], cards: newCards, result }
 
       const endCheck = checkGameEnd(quests)
@@ -348,7 +359,7 @@ function OnlineQuest({ game, roomCode, playerId }: PhaseProps) {
           quests,
           questCards: newCards,
           currentQuest: game.currentQuest + 1,
-          currentLeaderIndex: getNextLeaderIndex(game.currentLeaderIndex, game.players.length),
+          currentLeaderIndex: getNextLeaderIndex(game.currentLeaderIndex, safeArray(game.players).length),
         }
         const useLady = shouldUseLadyOfTheLake(nextGame)
         await updateGameState(roomCode, { ...nextGame, phase: useLady ? 'ladyOfTheLake' : 'questResult' })
@@ -377,7 +388,7 @@ function OnlineQuest({ game, roomCode, playerId }: PhaseProps) {
           <h1 className="text-xl font-bold mb-4">Quest {game.currentQuest + 1}</h1>
           <p className="text-slate-400">You are not on this quest.</p>
           <p className="text-sm text-slate-500 mt-2">
-            {game.questCards.length} / {quest.proposedTeam.length} cards played
+            {questCards.length} / {proposedTeam.length} cards played
           </p>
         </div>
       </div>
@@ -392,7 +403,7 @@ function OnlineQuest({ game, roomCode, playerId }: PhaseProps) {
           <h1 className="text-xl font-bold mb-4">Quest {game.currentQuest + 1}</h1>
           <p className="text-avalon-gold">Card submitted! Waiting for others...</p>
           <p className="text-sm text-slate-500 mt-2">
-            {game.questCards.length} / {quest.proposedTeam.length} cards played
+            {questCards.length} / {proposedTeam.length} cards played
           </p>
         </div>
       </div>
@@ -419,10 +430,11 @@ function OnlineQuest({ game, roomCode, playerId }: PhaseProps) {
 }
 
 function OnlineQuestResult({ game, roomCode, isHost }: PhaseProps) {
-  const justCompleted = game.quests[game.currentQuest - 1]
+  const justCompleted = safeArray(game.quests)[game.currentQuest - 1]
   const isSuccess = justCompleted?.result === 'success'
-  const failCount = justCompleted?.cards.filter((c) => c.action === 'fail').length ?? 0
-  const successCount = justCompleted?.cards.filter((c) => c.action === 'success').length ?? 0
+  const cards = safeArray(justCompleted?.cards)
+  const failCount = cards.filter((c) => c.action === 'fail').length
+  const successCount = cards.filter((c) => c.action === 'success').length
 
   return (
     <div className="flex flex-col min-h-full bg-avalon-dark">
@@ -454,13 +466,14 @@ function OnlineQuestResult({ game, roomCode, isHost }: PhaseProps) {
 
 function OnlineAssassination({ game, roomCode, playerId }: PhaseProps) {
   const [target, setTarget] = useState<string | null>(game.assassinTarget || null)
-  const assassin = game.players.find((p) => p.role === 'assassin')!
-  const isAssassin = assassin.id === playerId
-  const goodPlayers = game.players.filter((p) => p.alignment === 'good')
+  const players = safeArray(game.players)
+  const assassin = players.find((p) => p.role === 'assassin')!
+  const isAssassin = assassin?.id === playerId
+  const goodPlayers = players.filter((p) => p.alignment === 'good')
 
   const handleAssassinate = async () => {
     if (!target) return
-    const { winner, reason } = resolveAssassination(target, game.players)
+    const { winner, reason } = resolveAssassination(target, players)
     await updateGameState(roomCode, {
       ...game,
       assassinTarget: target,
@@ -508,15 +521,17 @@ function OnlineAssassination({ game, roomCode, playerId }: PhaseProps) {
 function OnlineLadyOfTheLake({ game, roomCode, playerId }: PhaseProps) {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null)
   const [showResult, setShowResult] = useState(false)
-  const holder = game.players.find((p) => p.id === game.ladyOfTheLakeHolder)!
-  const isHolder = holder.id === playerId
+  const players = safeArray(game.players)
+  const holder = players.find((p) => p.id === game.ladyOfTheLakeHolder)!
+  const isHolder = holder?.id === playerId
+  const history = safeArray(game.ladyOfTheLakeHistory)
 
-  const eligibleTargets = game.players.filter(
-    (p) => p.id !== game.ladyOfTheLakeHolder && !game.ladyOfTheLakeHistory.includes(p.id)
+  const eligibleTargets = players.filter(
+    (p) => p.id !== game.ladyOfTheLakeHolder && !history.includes(p.id)
   )
 
   if (showResult && game.ladyOfTheLakeResult) {
-    const target = game.players.find((p) => p.id === game.ladyOfTheLakeResult!.targetId)!
+    const target = players.find((p) => p.id === game.ladyOfTheLakeResult!.targetId)!
     const isGood = game.ladyOfTheLakeResult.alignment === 'good'
 
     return (
@@ -552,11 +567,11 @@ function OnlineLadyOfTheLake({ game, roomCode, playerId }: PhaseProps) {
 
   const handleInspect = async () => {
     if (!selectedTarget) return
-    const target = game.players.find((p) => p.id === selectedTarget)!
+    const target = players.find((p) => p.id === selectedTarget)!
     await updateGameState(roomCode, {
       ...game,
       ladyOfTheLakeResult: { targetId: selectedTarget, alignment: target.alignment as Alignment },
-      ladyOfTheLakeHistory: [...game.ladyOfTheLakeHistory, selectedTarget],
+      ladyOfTheLakeHistory: [...history, selectedTarget],
       ladyOfTheLakeHolder: selectedTarget,
     })
     setShowResult(true)
@@ -584,6 +599,7 @@ function OnlineLadyOfTheLake({ game, roomCode, playerId }: PhaseProps) {
 function OnlineGameOver({ game }: PhaseProps) {
   const navigate = useNavigate()
   const goodWon = game.winner === 'good'
+  const players = safeArray(game.players)
 
   return (
     <div className="flex flex-col min-h-full bg-avalon-dark">
@@ -592,11 +608,11 @@ function OnlineGameOver({ game }: PhaseProps) {
           <h1 className="text-4xl font-bold mb-2">{goodWon ? 'Good Wins!' : 'Evil Wins!'}</h1>
           <p className="text-sm opacity-80">{game.winReason}</p>
         </div>
-        <QuestTracker quests={game.quests} currentQuest={-1} players={game.players} />
+        <QuestTracker quests={safeArray(game.quests)} currentQuest={-1} players={players} />
         <div className="w-full max-w-sm mt-8">
           <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wide mb-4 text-center">All Roles Revealed</h2>
           <div className="space-y-2">
-            {game.players.map((player) => (
+            {players.map((player) => (
               <div key={player.id} className={`flex items-center gap-3 p-3 rounded-xl ${player.alignment === 'good' ? 'bg-avalon-good/10 border border-avalon-good/20' : 'bg-avalon-evil/10 border border-avalon-evil/20'}`}>
                 <PlayerAvatarWithName name={player.name} alignment={player.alignment} showAlignment size="sm" />
                 <div className="flex-1">
