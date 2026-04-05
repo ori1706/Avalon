@@ -26,7 +26,7 @@ function toArray<T>(val: T[] | Record<string, T> | null | undefined): T[] {
 }
 
 function normalizeGameState(raw: Record<string, unknown>): GameState {
-  const g = raw as GameState
+  const g = raw as unknown as GameState
   g.votes = toArray(g.votes)
   g.questCards = toArray(g.questCards)
   g.players = toArray(g.players)
