@@ -17,6 +17,33 @@ function sanitize<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj))
 }
 
+// Firebase RTDB drops empty arrays and may convert arrays to indexed objects.
+// This ensures all array fields are proper JS arrays with correct defaults.
+function toArray<T>(val: T[] | Record<string, T> | null | undefined): T[] {
+  if (!val) return []
+  if (Array.isArray(val)) return val
+  return Object.values(val)
+}
+
+function normalizeGameState(raw: Record<string, unknown>): GameState {
+  const g = raw as GameState
+  g.votes = toArray(g.votes)
+  g.questCards = toArray(g.questCards)
+  g.players = toArray(g.players)
+  g.ladyOfTheLakeHistory = toArray(g.ladyOfTheLakeHistory)
+  g.nightInfo = toArray(g.nightInfo).map((n) => ({
+    ...n,
+    sees: toArray(n.sees),
+  }))
+  g.quests = toArray(g.quests).map((q) => ({
+    ...q,
+    proposedTeam: toArray(q.proposedTeam),
+    votes: toArray(q.votes),
+    cards: toArray(q.cards),
+  }))
+  return g
+}
+
 function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
   let code = ''
@@ -90,7 +117,12 @@ export function subscribeToRoom(
 ): Unsubscribe {
   const db = getDb()
   return onValue(ref(db, `rooms/${code}`), (snapshot) => {
-    callback(snapshot.exists() ? (snapshot.val() as RoomData) : null)
+    if (!snapshot.exists()) return callback(null)
+    const room = snapshot.val() as RoomData
+    if (room.gameState) {
+      room.gameState = normalizeGameState(room.gameState as unknown as Record<string, unknown>)
+    }
+    callback(room)
   })
 }
 
@@ -148,7 +180,8 @@ export function subscribeToGameState(
 ): Unsubscribe {
   const db = getDb()
   return onValue(ref(db, `rooms/${code}/gameState`), (snapshot) => {
-    callback(snapshot.exists() ? (snapshot.val() as GameState) : null)
+    if (!snapshot.exists()) return callback(null)
+    callback(normalizeGameState(snapshot.val() as Record<string, unknown>))
   })
 }
 
